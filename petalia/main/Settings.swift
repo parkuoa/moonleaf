@@ -1,0 +1,992 @@
+//
+//  Settings.swift
+//  petalia
+//
+//  Copyright © 2026 naomisphere. All rights reserved.
+//
+
+import SwiftUI
+
+@_silgen_name("system")
+@discardableResult
+private func c_system(_ command: UnsafePointer<CChar>?) -> Int32
+
+private func escapeShellArg(_ arg: String) -> String {
+    return "'" + arg.replacingOccurrences(of: "'", with: "'\\''") + "'"
+}
+
+struct SettingsView: View {
+    @EnvironmentObject private var service: macpaperService
+    @State private var selectedTab: SettingsTab = .general
+    @State private var apiKey = ""
+    @State private var showAPIKeyField = false
+    @State private var isSaving = false
+    @State private var saveSuccess = false
+    @State private var apiKeyError: String?
+    @State private var showChangelogSheet = false
+    @State private var changelogText: String?
+    @State private var changelogLoading = false
+    @State private var ap_is_enabled: Bool = false
+    @State private var updateServer = ""
+    @State private var updateServerError: String?
+    @State private var isSavingUpdateServer = false
+    @State private var updateServerSaveSuccess = false
+
+    @AppStorage("checkForUpdates") private var checkForUpdates = true
+    @AppStorage("autoStartEnabled") private var autoStartEnabled = false
+    @AppStorage("exportFolderPath") private var exportFolderPath = ""
+    @AppStorage("useAsScreensaver") private var useAsScreensaver = false
+    @AppStorage("glassBackground") private var glassBackground = false
+    @AppStorage("appTheme") private var appTheme = "system"
+
+    @State private var visualizer_mode: String = "disabled"
+    @State private var visualizer_colorMode: String = "rainbow"
+    @State private var visualizer_customColor: String = "#FF00FF"
+    @State private var visualizer_transparency: Double = 0.6
+    @State private var visualizer_barCount: Int = 64
+    @State private var visualizer_maxHeight: Double = 0.5
+    @State private var visualizer_minHeight: Double = 4.0
+    
+    @State private var scalingMode: String = "fill"
+    @State private var videoFilter: String = "none"
+
+    private let updater = Updater()
+
+    enum SettingsTab: CaseIterable, Identifiable, Hashable {
+        case general, manager, playback
+
+        var id: Self { self }
+
+        var title: String {
+            switch self {
+            case .general: return NSLocalizedString("settings_general", comment: "General")
+            case .manager: return NSLocalizedString("settings_manager", comment: "Manager")
+            case .playback: return NSLocalizedString("settings_playback", comment: "Playback")
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .general: return "gearshape"
+            case .manager: return "macwindow"
+            case .playback: return "play.circle"
+            }
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 16) {
+                Image(systemName: "gearshape.fill")
+                    .font(Font(font_loader.regular(size: 24)))
+                    .foregroundStyle(Color.accent)
+
+                Text(NSLocalizedString("settings", comment: "Settings"))
+                    .font(Font(font_loader.bold(size: 22)))
+
+                Spacer()
+            }
+            .padding(.horizontal, 28)
+            .padding(.top, 24)
+            .padding(.bottom, 20)
+
+            HStack(spacing: 12) {
+                ForEach(SettingsTab.allCases, id: \.self) { tab in
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.15)) { selectedTab = tab }
+                    }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: tab.icon)
+                                .font(Font(font_loader.regular(size: 13)))
+                            Text(tab.title)
+                                .font(Font(font_loader.regular(size: 13)))
+                        }
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(selectedTab == tab ? Color.accent : Color.clear)
+                        )
+                        .foregroundStyle(selectedTab == tab ? .white : .secondary)
+                        .contentShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 28)
+            .padding(.bottom, 16)
+
+            Divider().padding(.horizontal, 20)
+
+            ScrollView(.vertical, showsIndicators: true) {
+                VStack(spacing: 24) {
+                    switch selectedTab {
+                    case .general: generalSettings
+                    case .manager: managerSettings
+                    case .playback: playbackSettings
+                    }
+                }
+                .padding(.horizontal, 28)
+                .padding(.vertical, 24)
+            }
+        }
+        .frame(minWidth: 550, idealWidth: 600, minHeight: 500, idealHeight: 550)
+        .background(Color.mainSurface)
+        .onAppear {
+            loadAPIKey()
+            ap_is_enabled = service.ap_is_enabled
+            loadVisualizerSettings()
+            loadExportFolder()
+            checkAutoStartStatus()
+            service.checkScreensaverStatus()
+            loadUpdateServer()
+        }
+        .sheet(isPresented: $showChangelogSheet) {
+            changelogSheet
+        }
+        .onChange(of: appTheme) { newValue in
+            if let delegate = NSApp.delegate as? AppDelegate {
+                delegate.updateAppearances(to: newValue)
+            }
+        }
+    }
+
+    private var changelogSheet: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text(NSLocalizedString("settings_update_log", comment: "Update Log"))
+                    .font(Font(font_loader.bold(size: 18)))
+                Spacer()
+                Button(action: { showChangelogSheet = false }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(Font(font_loader.regular(size: 20)))
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(20)
+
+            Divider()
+
+            if changelogLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(40)
+            } else if let text = changelogText, !text.isEmpty {
+                ScrollView {
+                    Text(text)
+                        .font(Font(font_loader.regular(size: 13)))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(20)
+                }
+            } else {
+                Text("No changelog available.")
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(40)
+            }
+        }
+        .frame(width: 500, height: 420)
+    }
+
+    private var generalSettings: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Section(title: NSLocalizedString("settings_startup", comment: "Startup")) {
+                SToggle(
+                    title: NSLocalizedString("settings_auto_start", comment: "Start at Login"),
+                    description: NSLocalizedString("settings_auto_start_desc", comment: ""),
+                    isOn: $autoStartEnabled
+                )
+                .onChange(of: autoStartEnabled) { newValue in toggleAutoStart(newValue) }
+            }
+
+            Section(title: NSLocalizedString("settings_updates", comment: "Updates")) {
+                VStack(spacing: 12) {
+                    SToggle(
+                        title: NSLocalizedString("settings_check_updates", comment: "Check for Updates"),
+                        description: NSLocalizedString("settings_check_updates_desc", comment: ""),
+                        isOn: $checkForUpdates
+                    )
+
+                    HStack {
+                        Spacer()
+                        Button(action: fetchChangelog) {
+                            HStack(spacing: 6) {
+                                if changelogLoading {
+                                    ProgressView().controlSize(.small)
+                                } else {
+                                    Image(systemName: "clock.arrow.circlepath")
+                                }
+                                Text(NSLocalizedString("settings_update_log", comment: "Update Log"))
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Update Server")
+                            .font(Font(font_loader.regular(size: 14)))
+                        
+                        HStack(spacing: 12) {
+                            TextField("github.com/naomisphere/...", text: $updateServer)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .onChange(of: updateServer) { validateUpdateServer($0) }
+
+                            Button(action: saveUpdateServer) {
+                                if isSavingUpdateServer {
+                                    ProgressView().controlSize(.small)
+                                } else if updateServerSaveSuccess {
+                                    Image(systemName: "checkmark").foregroundColor(.green)
+                                } else {
+                                    Text(NSLocalizedString("settings_save", comment: "Save"))
+                                }
+                            }
+                            .disabled(isSavingUpdateServer)
+                        }
+
+                        if let error = updateServerError {
+                            Text(error)
+                                .font(Font(font_loader.regular(size: 11)))
+                                .foregroundColor(.red)
+                        }
+                        
+                        Text("github.com/naomisphere/...")
+                            .font(Font(font_loader.regular(size: 11)))
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.top, 4)
+                }
+            }
+
+            Section(title: "Wallhaven") {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(NSLocalizedString("settings_api_key", comment: "API Key"))
+                        .font(Font(font_loader.regular(size: 14)))
+
+                    Text(NSLocalizedString("settings_api_key_description", comment: ""))
+                        .font(Font(font_loader.regular(size: 12)))
+                        .foregroundColor(.secondary)
+
+                    if showAPIKeyField {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 12) {
+                                SecureField(NSLocalizedString("settings_enter_api_key", comment: ""), text: $apiKey)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .onChange(of: apiKey) { validateAPIKey($0) }
+
+                                Button(action: saveAPIKey) {
+                                    if isSaving {
+                                        ProgressView().controlSize(.small)
+                                    } else if saveSuccess {
+                                        Image(systemName: "checkmark").foregroundColor(.green)
+                                    } else {
+                                        Text(NSLocalizedString("settings_save", comment: "Save"))
+                                    }
+                                }
+                                .disabled(isSaving)
+
+                                Button(action: {
+                                    showAPIKeyField = false
+                                    apiKeyError = nil
+                                }) {
+                                    Text(NSLocalizedString("settings_cancel", comment: "Cancel"))
+                                }
+                            }
+                            if let error = apiKeyError {
+                                Text(error)
+                                    .font(Font(font_loader.regular(size: 11)))
+                                    .foregroundColor(.red)
+                                    .padding(.leading, 4)
+                            }
+                        }
+                    } else {
+                        HStack(spacing: 12) {
+                            Text(apiKey.isEmpty ?
+                                 NSLocalizedString("settings_no_api_key", comment: "") :
+                                 NSLocalizedString("settings_api_key_set", comment: ""))
+                                .foregroundColor(apiKey.isEmpty ? .red : .green)
+
+                            Spacer()
+
+                            Button(action: { showAPIKeyField = true; apiKeyError = nil }) {
+                                Text(apiKey.isEmpty ?
+                                     NSLocalizedString("settings_add_api_key", comment: "") :
+                                     NSLocalizedString("settings_change_api_key", comment: ""))
+                            }
+                        }
+                    }
+                }
+                .padding()
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
+            }
+        }
+    }
+
+    private var managerSettings: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Section(title: NSLocalizedString("settings_appearance", comment: "Appearance")) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text(NSLocalizedString("settings_theme", value: "App Theme", comment: "App Theme"))
+                            .font(Font(font_loader.regular(size: 14)))
+                        Spacer()
+                        SegmentSelector(
+                            options: ["system", "light", "dark"],
+                            selection: $appTheme,
+                            displayName: { theme in
+                                switch theme {
+                                case "system": return NSLocalizedString("settings_theme_system", value: "System", comment: "System")
+                                case "light": return NSLocalizedString("settings_theme_light", value: "Light", comment: "Light")
+                                case "dark": return NSLocalizedString("settings_theme_dark", value: "Dark", comment: "Dark")
+                                default: return theme
+                                }
+                            }
+                        )
+                    }
+                    .padding()
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
+                    
+                    SToggle(
+                        title: NSLocalizedString("settings_glass_bg", comment: "Glass Background"),
+                        description: NSLocalizedString("settings_glass_bg_desc", comment: ""),
+                        isOn: $glassBackground
+                    )
+                    
+                    HStack(spacing: 6) {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 11))
+                        Text(NSLocalizedString("settings_appearance_restart_note", value: "Restart the app to apply theme or background changes.", comment: ""))
+                            .font(Font(font_loader.regular(size: 11)))
+                    }
+                    .foregroundColor(.secondary)
+                    .padding(.leading, 4)
+                    .padding(.top, 2)
+                }
+            }
+
+            Section(title: NSLocalizedString("settings_sort", comment: "Default Sort")) {
+                HStack {
+                    Text(NSLocalizedString("settings_sort", comment: "Sort by"))
+                        .font(Font(font_loader.regular(size: 14)))
+
+                    Spacer()
+
+                    SegmentSelector(
+                        options: macpaperService.LocalSortMode.allCases,
+                        selection: Binding(
+                            get: { service.localSort },
+                            set: { service.setLocalSort($0) }
+                        ),
+                        displayName: { $0.displayName }
+                    )
+                }
+                .padding()
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
+            }
+
+            Section(title: NSLocalizedString("settings_export", comment: "Export")) {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(NSLocalizedString("settings_export_folder", comment: "Export Folder"))
+                        .font(Font(font_loader.regular(size: 14)))
+
+                    Text(NSLocalizedString("settings_export_folder_desc", comment: ""))
+                        .font(Font(font_loader.regular(size: 12)))
+                        .foregroundColor(.secondary)
+
+                    HStack(spacing: 12) {
+                        Text(getDisplayFolderName())
+                            .font(Font(font_loader.regular(size: 13)))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+
+                        Spacer()
+
+                        Button(action: chooseFolder) {
+                            Text(NSLocalizedString("settings_choose_folder", comment: ""))
+                        }
+
+                        if !exportFolderPath.isEmpty {
+                            Button(action: {
+                                exportFolderPath = ""
+                                saveExportFolder()
+                            }) {
+                                Text(NSLocalizedString("settings_reset_folder", comment: ""))
+                            }
+                        }
+                    }
+                }
+                .padding()
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
+            }
+
+            Section(title: "Import Method") {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Choose how wallpapers are added to your library.")
+                                .font(Font(font_loader.regular(size: 12)))
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        SegmentSelector(
+                            options: macpaperService.ImportMethod.allCases,
+                            selection: $service.importMethod,
+                            displayName: { method in
+                                switch method {
+                                case .link: return "Link/Reference"
+                                case .copy: return "Copy"
+                                }
+                            }
+                        )
+                        .onChange(of: service.importMethod) { _ in service.saveSettings() }
+                    }
+                }
+                .padding()
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
+            }
+        }
+    }
+
+    private var playbackSettings: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Section(title: NSLocalizedString("settings_behavior", comment: "Behavior")) {
+                SToggle(
+                    title: NSLocalizedString("cfg_auto_pause", comment: "Smart Playback"),
+                    description: NSLocalizedString("cfg_auto_pause_desc", comment: ""),
+                    isOn: $ap_is_enabled
+                )
+                .onChange(of: ap_is_enabled) { service._ap_enabled($0) }
+            }
+
+            Section(title: NSLocalizedString("settings_shuffle", comment: "Shuffle")) {
+                VStack(spacing: 10) {
+                    SToggle(
+                        title: NSLocalizedString("settings_shuffle", comment: "Shuffle Wallpapers"),
+                        description: NSLocalizedString("settings_shuffle_desc", comment: ""),
+                        isOn: Binding(
+                            get: { service.shuffleEnabled },
+                            set: { service.setShuffleEnabled($0) }
+                        )
+                    )
+
+                    if service.shuffleEnabled {
+                        HStack {
+                            Text(NSLocalizedString("settings_shuffle_interval", comment: "Change every"))
+                                .font(Font(font_loader.regular(size: 13)))
+                                .foregroundColor(.secondary)
+
+                            Spacer()
+
+                            SegmentSelector(
+                                options: macpaperService.ShuffleInterval.allCases,
+                                selection: Binding(
+                                    get: { service.shuffleInterval },
+                                    set: { service.setShuffleInterval($0) }
+                                ),
+                                displayName: { $0.displayName }
+                            )
+                        }
+                        .padding(.horizontal, 16)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+                }
+            }
+
+            Section(title: "Playback Effects") {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("Wallpaper Scaling")
+                            .font(Font(font_loader.regular(size: 14)))
+                        Spacer()
+                        SegmentSelector(
+                            options: ["fill", "fit", "stretch", "center", "tile"],
+                            selection: $scalingMode,
+                            displayName: { mode in
+                                switch mode {
+                                case "fill": return "Fill Screen"
+                                case "fit": return "Fit to Screen"
+                                case "stretch": return "Stretch to Fill"
+                                case "center": return "Center"
+                                case "tile": return "Tile"
+                                default: return mode
+                                }
+                            }
+                        )
+                        .onChange(of: scalingMode) { _ in saveVisualizerSettings() }
+                    }
+                    
+                    Divider().padding(.vertical, 4)
+                    
+                    HStack {
+                        Text("Video Filter")
+                            .font(Font(font_loader.regular(size: 14)))
+                        Spacer()
+                        SegmentSelector(
+                            options: ["none", "grayscale", "invert", "sepia"],
+                            selection: $videoFilter,
+                            displayName: { filter in
+                                switch filter {
+                                case "none": return "None"
+                                case "grayscale": return "Grayscale"
+                                case "invert": return "Invert"
+                                case "sepia": return "Sepia"
+                                default: return filter
+                                }
+                            }
+                        )
+                        .onChange(of: videoFilter) { _ in saveVisualizerSettings() }
+                    }
+                }
+                .padding()
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
+            }
+
+            Section(title: "Audio Visualizer (beta)") {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("Visualizer Mode")
+                            .font(Font(font_loader.regular(size: 14)))
+                        Spacer()
+                        SegmentSelector(
+                            options: ["disabled", "wallpaper"],
+                            selection: $visualizer_mode,
+                            displayName: { mode in
+                                switch mode {
+                                case "disabled": return "Disabled"
+                                case "wallpaper": return "Wallpaper Audio"
+                                default: return mode
+                                }
+                            }
+                        )
+                        .onChange(of: visualizer_mode) { _ in saveVisualizerSettings() }
+                    }
+
+                    Divider().padding(.vertical, 4)
+
+                    HStack {
+                        Text("Color Mode")
+                            .font(Font(font_loader.regular(size: 14)))
+                        Spacer()
+                        SegmentSelector(
+                            options: ["rainbow", "custom"],
+                            selection: $visualizer_colorMode,
+                            displayName: { mode in
+                                switch mode {
+                                case "rainbow": return "Rainbow"
+                                case "custom": return "Custom"
+                                default: return mode
+                                }
+                            }
+                        )
+                        .onChange(of: visualizer_colorMode) { _ in saveVisualizerSettings() }
+                    }
+
+                    if visualizer_colorMode == "custom" {
+                        Divider().padding(.vertical, 4)
+                        HStack {
+                            Text("Color:")
+                                .font(Font(font_loader.regular(size: 14)))
+                            Spacer()
+                            TextField("#FF00FF", text: $visualizer_customColor)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .frame(width: 100)
+                                .onChange(of: visualizer_customColor) { _ in saveVisualizerSettings() }
+                        }
+                    }
+
+                    Divider().padding(.vertical, 4)
+
+                    HStack {
+                        Text("Transparency:")
+                            .font(Font(font_loader.regular(size: 14)))
+                        Spacer()
+                        Slider(value: $visualizer_transparency, in: 0.1...1.0, step: 0.05)
+                            .frame(width: 150)
+                            .onChange(of: visualizer_transparency) { _ in saveVisualizerSettings() }
+                        Text("\(Int(visualizer_transparency * 100))%")
+                            .font(Font(font_loader.regular(size: 12)))
+                            .frame(width: 35)
+                    }
+
+                    Divider().padding(.vertical, 4)
+
+                    HStack {
+                        Text("Bar Count:")
+                            .font(Font(font_loader.regular(size: 14)))
+                        Spacer()
+                        SegmentSelector(
+                            options: [32, 48, 64, 80, 96],
+                            selection: $visualizer_barCount,
+                            displayName: { "\($0)" }
+                        )
+                        .onChange(of: visualizer_barCount) { _ in saveVisualizerSettings() }
+                    }
+
+                    Divider().padding(.vertical, 4)
+
+                    HStack {
+                        Text("Max Height:")
+                            .font(Font(font_loader.regular(size: 14)))
+                        Spacer()
+                        Slider(value: $visualizer_maxHeight, in: 0.1...1.0, step: 0.05)
+                            .frame(width: 150)
+                            .onChange(of: visualizer_maxHeight) { _ in saveVisualizerSettings() }
+                        Text("\(Int(visualizer_maxHeight * 100))%")
+                            .font(Font(font_loader.regular(size: 12)))
+                            .frame(width: 35)
+                    }
+
+                    Divider().padding(.vertical, 4)
+
+                    HStack {
+                        Text("Min Height:")
+                            .font(Font(font_loader.regular(size: 14)))
+                        Spacer()
+                        Slider(value: $visualizer_minHeight, in: 1.0...20.0, step: 1.0)
+                            .frame(width: 150)
+                            .onChange(of: visualizer_minHeight) { _ in saveVisualizerSettings() }
+                        Text("\(Int(visualizer_minHeight))px")
+                            .font(Font(font_loader.regular(size: 12)))
+                            .frame(width: 35)
+                    }
+                }
+                .padding()
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
+            }
+
+            Section(title: NSLocalizedString("settings_volume", comment: "Volume")) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text(NSLocalizedString("settings_default_volume", comment: "Default Volume"))
+                            .font(Font(font_loader.regular(size: 14)))
+                        Spacer()
+                        Text("\(Int(service.volume * 100))%")
+                            .font(Font(font_loader.regular(size: 12)))
+                            .foregroundColor(.secondary)
+                    }
+                    Slider(value: $service.volume, in: 0...1, step: 0.05)
+                        .onChange(of: service.volume) { service.chvol($0) }
+                }
+                .padding()
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
+            }
+        }
+    }
+
+    private func fetchChangelog() {
+        changelogLoading = true
+        showChangelogSheet = true
+        updater.fetchChangelog { text in
+            self.changelogText = text
+            self.changelogLoading = false
+        }
+    }
+
+    private func loadVisualizerSettings() {
+        let settingsFile = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".config/petalia/settings.json")
+
+        guard FileManager.default.fileExists(atPath: settingsFile.path),
+              let data = try? Data(contentsOf: settingsFile),
+              let settings = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+
+        visualizer_mode = settings["visualizer_mode"] as? String ?? "disabled"
+        visualizer_colorMode = settings["visualizer_colorMode"] as? String ?? "rainbow"
+        visualizer_customColor = settings["visualizer_customColor"] as? String ?? "#FF00FF"
+        visualizer_transparency = settings["visualizer_transparency"] as? Double ?? 0.6
+        visualizer_barCount = settings["visualizer_barCount"] as? Int ?? 64
+        visualizer_maxHeight = settings["visualizer_maxHeight"] as? Double ?? 0.5
+        visualizer_minHeight = settings["visualizer_minHeight"] as? Double ?? 4.0
+        scalingMode = settings["scalingMode"] as? String ?? "fill"
+        videoFilter = settings["videoFilter"] as? String ?? "none"
+    }
+
+    private func saveVisualizerSettings() {
+        let settingsFile = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".config/petalia/settings.json")
+
+        var settings: [String: Any] = [:]
+        if FileManager.default.fileExists(atPath: settingsFile.path),
+           let data = try? Data(contentsOf: settingsFile),
+           let existing = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            settings = existing
+        }
+
+        settings["visualizer_mode"] = visualizer_mode
+        settings["visualizer_colorMode"] = visualizer_colorMode
+        settings["visualizer_customColor"] = visualizer_customColor
+        settings["visualizer_transparency"] = visualizer_transparency
+        settings["visualizer_barCount"] = visualizer_barCount
+        settings["visualizer_maxHeight"] = visualizer_maxHeight
+        settings["visualizer_minHeight"] = visualizer_minHeight
+        settings["scalingMode"] = scalingMode
+        settings["videoFilter"] = videoFilter
+
+        if let data = try? JSONSerialization.data(withJSONObject: settings, options: .prettyPrinted) {
+            try? FileManager.default.createDirectory(
+                at: settingsFile.deletingLastPathComponent(),
+                withIntermediateDirectories: true)
+            try? data.write(to: settingsFile)
+
+            DistributedNotificationCenter.default().postNotificationName(
+                Notification.Name("com.naomisphere.petalia.visualizerSettingsChanged"),
+                object: nil,
+                deliverImmediately: true
+            )
+        }
+    }
+
+    private func getDisplayFolderName() -> String {
+        if exportFolderPath.isEmpty {
+            return FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first?.lastPathComponent
+                ?? NSLocalizedString("settings_export_folder_default", comment: "")
+        }
+        return (exportFolderPath as NSString).lastPathComponent
+    }
+
+    private func chooseFolder() {
+        let previousPolicy = NSApp.activationPolicy()
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        panel.title = NSLocalizedString("settings_choose_folder", comment: "")
+        panel.prompt = NSLocalizedString("settings_choose_folder", comment: "")
+
+        if !exportFolderPath.isEmpty {
+            panel.directoryURL = URL(fileURLWithPath: exportFolderPath)
+        } else if let picturesURL = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first {
+            panel.directoryURL = picturesURL
+        }
+
+        panel.begin { response in
+            if response == .OK, let url = panel.url {
+                self.exportFolderPath = url.path
+                self.saveExportFolder()
+            }
+            if previousPolicy == .accessory && NSApp.windows.filter({ $0.isVisible }).isEmpty {
+                NSApp.setActivationPolicy(.accessory)
+            }
+        }
+    }
+
+    private func validateAPIKey(_ key: String) {
+        if key.isEmpty { apiKeyError = nil; return }
+        apiKeyError = key.count != 32 ? NSLocalizedString("settings_invalid_api_key", comment: "") : nil
+    }
+
+    private func loadAPIKey() {
+        let keyFile = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".local/share/macpaper/WH_API_KEY")
+        if FileManager.default.fileExists(atPath: keyFile.path),
+           let key = try? String(contentsOf: keyFile) {
+            apiKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
+
+    private func saveAPIKey() {
+        if !apiKey.isEmpty && apiKeyError != nil { return }
+        isSaving = true
+        saveSuccess = false
+
+        let keyFile = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".local/share/macpaper/WH_API_KEY")
+
+        do {
+            try FileManager.default.createDirectory(
+                at: keyFile.deletingLastPathComponent(),
+                withIntermediateDirectories: true)
+            if apiKey.isEmpty {
+                if FileManager.default.fileExists(atPath: keyFile.path) {
+                    try FileManager.default.removeItem(at: keyFile)
+                }
+            } else {
+                try apiKey.write(to: keyFile, atomically: true, encoding: .utf8)
+            }
+            saveSuccess = true
+            showAPIKeyField = false
+            apiKeyError = nil
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { self.saveSuccess = false }
+        } catch {}
+
+        isSaving = false
+    }
+
+    private func toggleAutoStart(_ enabled: Bool) {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let launchAgent = home.appendingPathComponent("Library/LaunchAgents/com.naomisphere.macpaper.app.plist")
+        let appPath = Bundle.main.bundlePath
+
+        if enabled {
+            let plist = """
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.naomisphere.macpaper.app</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>\(appPath)/Contents/MacOS/macpaper</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <false/>
+</dict>
+</plist>
+"""
+            do {
+                try FileManager.default.createDirectory(
+                    at: launchAgent.deletingLastPathComponent(),
+                    withIntermediateDirectories: true)
+                try plist.write(to: launchAgent, atomically: true, encoding: .utf8)
+                let status = c_system("launchctl load \(escapeShellArg(launchAgent.path))")
+                if (status >> 8) != 0 {
+                    autoStartEnabled = false
+                }
+            } catch { autoStartEnabled = false }
+        } else {
+            c_system("launchctl unload \(escapeShellArg(launchAgent.path)) > /dev/null 2>&1")
+            try? FileManager.default.removeItem(at: launchAgent)
+        }
+    }
+
+    private func checkAutoStartStatus() {
+        let launchAgent = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/LaunchAgents/com.naomisphere.macpaper.app.plist")
+        autoStartEnabled = FileManager.default.fileExists(atPath: launchAgent.path)
+    }
+
+    private func loadExportFolder() {
+        let settingsFile = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".local/share/macpaper/export_folder")
+
+        if FileManager.default.fileExists(atPath: settingsFile.path),
+           let path = try? String(contentsOf: settingsFile) {
+            exportFolderPath = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        if exportFolderPath.isEmpty,
+           let picturesPath = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first?.path {
+            exportFolderPath = picturesPath
+        }
+    }
+
+    private func saveExportFolder() {
+        let settingsFile = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".local/share/macpaper/export_folder")
+        do {
+            try FileManager.default.createDirectory(
+                at: settingsFile.deletingLastPathComponent(),
+                withIntermediateDirectories: true)
+            if exportFolderPath.isEmpty {
+                if FileManager.default.fileExists(atPath: settingsFile.path) {
+                    try FileManager.default.removeItem(at: settingsFile)
+                }
+            } else {
+                try exportFolderPath.write(to: settingsFile, atomically: true, encoding: .utf8)
+            }
+        } catch {}
+    }
+
+    private func validateUpdateServer(_ server: String) {
+        if server.isEmpty {
+            updateServerError = nil
+            return
+        }
+        if !server.lowercased().hasPrefix("github.com/naomisphere") {
+            updateServerError = "Server must start with github.com/naomisphere"
+        } else {
+            updateServerError = nil
+        }
+    }
+
+    private func loadUpdateServer() {
+        let serverFile = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".local/share/macpaper/update_server")
+        if FileManager.default.fileExists(atPath: serverFile.path),
+           let server = try? String(contentsOf: serverFile) {
+            let trimmed = server.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.lowercased().hasPrefix("github.com/naomisphere") {
+                updateServer = trimmed
+            }
+        }
+    }
+
+    private func saveUpdateServer() {
+        validateUpdateServer(updateServer)
+        if updateServerError != nil { return }
+        
+        isSavingUpdateServer = true
+        let serverFile = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".local/share/macpaper/update_server")
+        
+        do {
+            try FileManager.default.createDirectory(
+                at: serverFile.deletingLastPathComponent(),
+                withIntermediateDirectories: true)
+            if updateServer.isEmpty {
+                if FileManager.default.fileExists(atPath: serverFile.path) {
+                    try FileManager.default.removeItem(at: serverFile)
+                }
+            } else {
+                try updateServer.write(to: serverFile, atomically: true, encoding: .utf8)
+            }
+            updateServerSaveSuccess = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { updateServerSaveSuccess = false }
+        } catch {}
+        isSavingUpdateServer = false
+    }
+}
+
+struct Section<Content: View>: View {
+    let title: String
+    let content: Content
+
+    init(title: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(Font(font_loader.bold(size: 16)))
+                .foregroundStyle(.primary.opacity(0.8))
+                .padding(.leading, 4)
+            content
+        }
+    }
+}
+
+struct SToggle: View {
+    let title: String
+    let description: String
+    @Binding var isOn: Bool
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(Font(font_loader.regular(size: 14)))
+                Text(description)
+                    .font(Font(font_loader.regular(size: 12)))
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+            Toggle("", isOn: $isOn)
+                .toggleStyle(SwitchToggleStyle(tint: Color.accent))
+                .labelsHidden()
+        }
+        .padding()
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
+    }
+}

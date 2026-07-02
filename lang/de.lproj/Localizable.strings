@@ -1,4 +1,4 @@
-"mgr_title" = "moonleaf";
+"mgr_title" = "Petalia";
 "mgr_wp_title" = "Hintergrundbilder";
 "mgr_browse_title" = "Durchsuchen";
 "add_wallpaper" = "Hintergrundbild hinzufügen";
@@ -29,12 +29,12 @@
 "sb_refresh" = "Aktualisieren";
 "sb_open_mgr" = "Manager öffnen";
 "sb_settings" = "Einstellungen";
-"sb_about" = "Über moonleaf";
-"sb_about_text" = "Version %@ (%@)\n\nDer Live-Hintergrundbild-Manager für macOS";
+"sb_about" = "Über Petalia";
+"sb_about_text" = "Version %@ (%@)\nDer Live-Hintergrundbild-Manager für macOS";
 "sb_about_github" = "GitHub";
 "sb_about_kofi" = "Auf Ko-fi unterstützen";
 "sb_perst_tooltip" = "Hintergrundbild automatisch beim Anmelden starten";
-"sb_quit" = "moonleaf beenden";
+"sb_quit" = "Petalia beenden";
 
 "mgr_settings" = "Einstellungen";
 "settings" = "Einstellungen";
@@ -95,7 +95,7 @@
 "settings_general" = "Allgemein";
 "settings_startup" = "Start";
 "settings_auto_start" = "Beim Anmelden starten";
-"settings_auto_start_desc" = "moonleaf automatisch beim Anmelden starten";
+"settings_auto_start_desc" = "Petalia automatisch beim Anmelden starten";
 "settings_updates" = "Updates";
 "settings_check_updates" = "Nach Updates suchen";
 "settings_check_updates_desc" = "Beim Start nach Updates suchen";

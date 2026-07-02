@@ -1,6 +1,6 @@
 ---
 name: Feedback
-about: Give feedback regarding moonleaf or a specific part of it
+about: Give feedback regarding Petalia or a specific part of it
 title: ''
 labels: ''
 assignees: ''

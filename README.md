@@ -1,8 +1,8 @@
 <h1 align="center">
   <br>
-  <a href="https://github.com/parkuoa/moonleaf"><img src="./artwork/png/moonleaf2.png" alt="moonleaf" width="150"></a>
+  <a href="https://github.com/parkuoa/moonleaf"><img src="./artwork/png/icon (2).png" alt="Petalia" width="150"></a>
   <br>
-  moonleaf
+  Petalia
   <br>
 </h1>
 <p align="center">
@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-moonleaf is a feature-packed Wallpaper Manager for macOS, with support for gifs, videos, online wallpaper browsing, multi-monitor wallpapers, exporting, among other many things!
+Petalia is a feature-packed Wallpaper Manager for macOS, with support for gifs, videos, online wallpaper browsing, multi-monitor wallpapers, exporting, among other many things!</
 </p>
 
 <h1 align="center">
@@ -45,7 +45,7 @@ brew install --cask parkuoa/moonleaf/moonleaf
 ```
 then,
 ```
-xattr -dr com.apple.quarantine /Applications/moonleaf.app
+xattr -dr com.apple.quarantine /Applications/Petalia.app
 ```
 
 ## Manual
@@ -60,13 +60,13 @@ xattr -dr com.apple.quarantine /Applications/moonleaf.app
 > You only need to do this once.
 
 <p align="center">
-  <a href="https://github.com/parkuoa/moonleaf/releases/latest/download/moonleaf.dmg" target="_self"><img width="200" src="https://github.com/user-attachments/assets/e2b187d1-8010-45cf-a9d4-e7ce5e2e677c" /></a>
+  <a href="https://github.com/parkuoa/moonleaf/releases/latest/download/Petalia.dmg" target="_self"><img width="200" src="https://github.com/user-attachments/assets/e2b187d1-8010-45cf-a9d4-e7ce5e2e677c" /></a>
 </p>
 
 ---
 
 ## License
-moonleaf is licensed under the [MIT License](./LICENSE). \
+Petalia is licensed under the [MIT License](./LICENSE). \
 Versions pre-v3.0 (macpaper) are licensed under the GNU General Public License v3.0 (GPLv3). 
 
 ## 🔨 Building from Source
@@ -86,15 +86,15 @@ It is advised that you, alongside the strings file, place a file named `credit` 
 ### Quarantine
 If you suspect the app is quarantined, run the following on your Terminal after dragging the app to Applications:
 ```bash
-xattr -l /Applications/moonleaf.app
+xattr -l /Applications/Petalia.app
 ```
 Which shall output ```com.apple.quarantine: ...;{BROWSER};``` if the app IS quarantined.
 In that case, run:
 ```bash
-xattr -dr com.apple.quarantine /Applications/moonleaf.app
+xattr -dr com.apple.quarantine /Applications/Petalia.app
 ```
 
-### Apple could not verify "moonleaf" is free of malware...
+### Apple could not verify "Petalia" is free of malware...
 You can fix this by doing the same steps as [here](https://github.com/parkuoa/moonleaf/tree/main/README.md#installation).
 
 ## ❤️ Support me

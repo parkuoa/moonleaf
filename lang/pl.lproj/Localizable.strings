@@ -1,4 +1,4 @@
-"mgr_title" = "moonleaf";
+"mgr_title" = "Petalia";
 "mgr_wp_title" = "tapety";
 "mgr_browse_title" = "przeglądaj";
 "add_wallpaper" = "dodaj tapetę";
@@ -29,12 +29,12 @@
 "sb_refresh" = "Odśwież";
 "sb_open_mgr" = "Otwórz Menedżera";
 "sb_settings" = "Ustawienia";
-"sb_about" = "O moonleaf";
-"sb_about_text" = "Wersja %@ (%@)\n\nMenedżer Tapet dla macOS";
+"sb_about" = "O Petalia";
+"sb_about_text" = "Wersja %@ (%@)\nMenedżer Tapet dla macOS";
 "sb_about_github" = "GitHub";
 "sb_about_kofi" = "Wesprzyj na Ko-fi";
 "sb_perst_tooltip" = "Automatycznie włącz tapetę na starcie systemu";
-"sb_quit" = "Zamknij moonleaf";
+"sb_quit" = "Zamknij Petalia";
 
 "mgr_settings" = "ustawienia";
 "settings" = "Ustawienia";
@@ -95,7 +95,7 @@
 "settings_general" = "Ogólne";
 "settings_startup" = "Uruchamianie";
 "settings_auto_start" = "Uruchom od razu";
-"settings_auto_start_desc" = "Automatycznie włącz moonleaf przy starcie systemu";
+"settings_auto_start_desc" = "Automatycznie włącz Petalia przy starcie systemu";
 "settings_updates" = "Aktualizowanie";
 "settings_check_updates" = "Sprawdzaj Aktualizacje";
 "settings_check_updates_desc" = "Sprawdzaj Aktualizacje przy uruchomieniu";

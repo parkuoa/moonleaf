@@ -70,6 +70,7 @@ moonleaf is licensed under the [MIT License](./LICENSE). \
 Versions pre-v3.0 (macpaper) are licensed under the GNU General Public License v3.0 (GPLv3). 
 
 ## 🔨 Building from Source
+### Note: to build from source, you must have CLT and Xcode installed.
 - Clone the repo
 - Run ```scripts/build.sh```, optionally with the --all flag to build for all archs (will default to host arch)
 
@@ -99,4 +100,4 @@ You can fix this by doing the same steps as [here](https://github.com/parkuoa/mo
 
 ## ❤️ Support me
 ☕ If you like my work and want to support me, you can do so via Ko-fi:\
-https://ko-fi.com/naomisphere
+https://ko-fi.com/parkuoa

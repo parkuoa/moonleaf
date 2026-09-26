@@ -1,0 +1,165 @@
+"mgr_title" = "moonleaf";
+"mgr_wp_title" = "tapety";
+"mgr_browse_title" = "prehľadávať";
+"add_wallpaper" = "pridať tapetu";
+"persist" = "zachovať";
+"unset_current" = "zrušiť aktuálnu";
+"refresh" = "obnoviť";
+"loading_wallpapers" = "načítavajú sa tapety...";
+"scanning_files" = "vyhľadávajú sa súbory";
+"no_wallpapers_found" = "nenašli sa žiadne tapety";
+"drop_files_or_add" = "presuňte sem súbory alebo kliknite na „pridať tapetu“";
+"supported_formats" = "podporované formáty: .mp4, .mov, .gif, .png, .jpg, .jpeg";
+"set_wallpaper" = "nastaviť tapetu";
+"gif_format" = "GIF";
+"video_format" = "video";
+
+"filter" = "filter";
+"show_types" = "Zobraziť";
+"show_videos" = "Videá";
+"show_images" = "Obrázky";
+
+"sb_no_wallpapers" = "Nenašli sa žiadne tapety";
+"sb_wallpapers" = "Tapety";
+"sb_large_count" = "ďalších %d...";
+"sb_perst_enabled" = "Trvalé nastavenie zapnuté";
+"sb_enable_perst" = "Zapnúť trvalé nastavenie";
+"sb_unset_wp" = "Zrušiť živú tapetu";
+"sb_show_all" = "Zobraziť všetky...";
+"sb_refresh" = "Obnoviť";
+"sb_open_mgr" = "Otvoriť správcu";
+"sb_settings" = "Nastavenia";
+"sb_about" = "O aplikácii moonleaf";
+"sb_about_text" = "Verzia %@ (%@)\n\nSprávca tapiet pre macOS";
+"sb_about_github" = "GitHub";
+"sb_about_kofi" = "Podporiť na Ko-fi";
+"sb_perst_tooltip" = "Automaticky spustiť tapetu po prihlásení";
+"sb_quit" = "Ukončiť moonleaf";
+
+"mgr_settings" = "nastavenia";
+"settings" = "Nastavenia";
+"cfg_auto_pause" = "Inteligentné prehrávanie";
+"cfg_auto_pause_desc" = "Pozastaviť prehrávanie tapety, keď sú aplikácie v režime celej obrazovky";
+
+"browse_save" = "Uložiť";
+"browse_cancel" = "Zrušiť";
+"browse_search_placeholder" = "Hľadať tapety...";
+"browse_filters" = "Filtre";
+"browse_category" = "Kategória";
+"browse_purity" = "Vhodnosť obsahu";
+"browse_sort" = "Zoradiť podľa";
+"browse_desc" = "Zostupne";
+"browse_asc" = "Vzostupne";
+"browse_apply" = "Použiť filtre";
+"browse_loading" = "Načítavajú sa tapety...";
+"browse_no_results" = "Nenašli sa žiadne tapety";
+"browse_try_search" = "Skúste upraviť vyhľadávanie alebo filtre";
+"browse_provider" = "Zdroje";
+"browse_wallhaven" = "Wallhaven";
+"browse_local" = "Miestna knižnica";
+"browse_resolution" = "Rozlíšenie";
+"filter_resolution_all" = "Všetky";
+"browse_download" = "Stiahnuť tapetu";
+"export_wallpaper" = "Exportovať tapetu";
+"export_error" = "Export zlyhal";
+"export_original" = "Pôvodná veľkosť";
+"export_iphone_header" = "iPhone";
+"export_iphone_15_pro_max" = "iPhone 15 Pro Max (1290×2796)";
+"export_iphone_15_pro" = "iPhone 15 Pro (1179×2556)";
+"export_iphone_14_pro" = "iPhone 14 Pro (1179×2556)";
+"export_iphone_13_pro" = "iPhone 13 Pro (1170×2532)";
+"export_iphone_se" = "iPhone SE (750×1334)";
+"export_ipad_header" = "iPad";
+"export_ipad_pro_12" = "iPad Pro 12,9\" (2732×2048)";
+"export_ipad_pro_11" = "iPad Pro 11\" (2388×1668)";
+"export_desktop_header" = "Počítač";
+"export_4k" = "4K UHD (3840×2160)";
+"export_1440p" = "1440p (2560×1440)";
+"export_1080p" = "1080p (1920×1080)";
+"export_ultrawide" = "Ultrawide 21:9 (3440×1440)";
+
+"sort_date" = "Dátum pridania";
+"sort_relevance" = "Relevantnosť";
+"sort_random" = "Náhodne";
+"sort_views" = "Počet zobrazení";
+"sort_favorites" = "Obľúbenosť";
+"sort_top" = "Najlepšie";
+
+"purity_all" = "Všetky";
+
+"category_general" = "Všeobecné";
+"category_anime" = "Anime";
+"category_people" = "Ľudia";
+"category_all" = "Všetky";
+
+"settings_general" = "Všeobecné";
+"settings_startup" = "Spustenie";
+"settings_auto_start" = "Spustiť po prihlásení";
+"settings_auto_start_desc" = "Automaticky spustiť moonleaf po prihlásení";
+"settings_updates" = "Aktualizácie";
+"settings_check_updates" = "Kontrolovať aktualizácie";
+"settings_check_updates_desc" = "Skontrolovať aktualizácie pri spustení";
+"settings_update_log" = "História aktualizácií";
+"settings_export" = "Export";
+"settings_export_folder" = "Priečinok exportu";
+"settings_export_folder_desc" = "Vyberte, kam sa majú ukladať exportované tapety";
+"settings_export_folder_default" = "Priečinok Obrázky";
+"settings_choose_folder" = "Vybrať priečinok";
+"settings_reset_folder" = "Obnoviť";
+
+"settings_screensaver" = "Šetrič obrazovky";
+"settings_use_screensaver" = "-";
+"settings_use_screensaver_desc" = "-";
+"settings_screensaver_hint" = "-";
+
+"settings_manager" = "Správca";
+"settings_playback" = "Prehrávanie";
+"settings_appearance" = "Vzhľad";
+"settings_glass_bg" = "Neviditeľné pozadie";
+"settings_glass_bg_desc" = "Skryť pozadie aplikácie správcu (vyžaduje reštart)";
+
+"settings_behavior" = "Správanie prehrávania";
+"settings_volume" = "Hlasitosť prehrávania";
+"settings_default_volume" = "Predvolená hlasitosť";
+
+"settings_shuffle" = "Náhodne striedať tapety";
+"settings_shuffle_desc" = "Automaticky striedať tapety z vašej knižnice";
+"settings_shuffle_interval" = "Meniť každých";
+"shuffle_interval_15min" = "15 minút";
+"shuffle_interval_1hr" = "1 hodinu";
+"shuffle_interval_3hr" = "3 hodiny";
+"shuffle_interval_daily" = "Denne";
+
+"settings_sort" = "Predvolené zoradenie";
+"sort_by_date" = "Dátum pridania";
+"sort_by_name" = "Názov";
+"sort_by_size" = "Veľkosť súboru";
+
+"settings_api_key" = "API kľúč Wallhaven";
+"settings_api_key_description" = "Ak máte účet Wallhaven, môžete použiť svoj API kľúč.";
+"settings_enter_api_key" = "Zadajte API kľúč";
+"settings_save" = "Uložiť";
+"settings_cancel" = "Zrušiť";
+"settings_no_api_key" = "Nie je nastavený žiadny API kľúč";
+"settings_api_key_set" = "API kľúč je nastavený";
+"settings_add_api_key" = "Pridať API kľúč";
+"settings_change_api_key" = "Zmeniť";
+"settings_invalid_api_key" = "Neplatný API kľúč";
+
+"download_options_title" = "Možnosti stiahnutia";
+"download_original" = "Stiahnuť originál";
+"download_custom_ratio" = "Vlastný pomer strán";
+"download_custom_title" = "Vlastné stiahnutie";
+"download_custom_desc" = "Vyberte zariadenie na orezanie obrázka";
+"crop_editor_title" = "Orezať obrázok";
+"crop_zoom" = "Priblíženie";
+"crop_apply" = "Použiť";
+"settings_change_folder" = "Zmeniť priečinok";
+"settings_select_folder" = "Vybrať priečinok";
+"export_aspect_ratio" = "Pomer strán";
+
+"favorites_filter" = "Obľúbené";
+"show_favorites" = "Iba obľúbené";
+"show_all_wallpapers" = "Všetky tapety";
+"no_favorites" = "Zatiaľ nemáte žiadne obľúbené";
+"no_favorites_desc" = "Ťuknutím na hviezdičku pridáte tapetu medzi obľúbené";

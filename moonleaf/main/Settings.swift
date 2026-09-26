@@ -726,7 +726,8 @@ struct SettingsView: View {
     private func toggleAutoStart(_ enabled: Bool) {
         let home = FileManager.default.homeDirectoryForCurrentUser
         let launchAgent = home.appendingPathComponent("Library/LaunchAgents/com.naomisphere.macpaper.app.plist")
-        let appPath = Bundle.main.bundlePath
+        let executablePath = Bundle.main.executableURL?.path
+            ?? "\(Bundle.main.bundlePath)/Contents/MacOS/moonleaf"
 
         if enabled {
             let plist = """
@@ -738,7 +739,7 @@ struct SettingsView: View {
     <string>com.naomisphere.macpaper.app</string>
     <key>ProgramArguments</key>
     <array>
-        <string>\(appPath)/Contents/MacOS/macpaper</string>
+        <string>\(executablePath)</string>
     </array>
     <key>RunAtLoad</key>
     <true/>

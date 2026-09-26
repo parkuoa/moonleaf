@@ -35,18 +35,20 @@ class macpaperService: NSObject, ObservableObject {
         return navStack.isEmpty
     }
 
+    private static let home = FileManager.default.homeDirectoryForCurrentUser
+    static let wp_storage_dir = home.appendingPathComponent(".local/share/paper/wallpaper")
+    static let settings_file = home.appendingPathComponent(".config/moonleaf/settings.json")
+
     private let wrapped_obj: String
     private let wallpaper_cli: String
     private let glasswp_path: String
-    private let wp_storage_dir = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".local/share/paper/wallpaper")
-    private let settings_file = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".config/moonleaf/settings.json")
+    private let wp_storage_dir = macpaperService.wp_storage_dir
+    private let settings_file = macpaperService.settings_file
     private let export_folder_file = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent(".config/moonleaf/export_folder")
     private let screen_wallpapers_file = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent(".config/moonleaf/screen_wallpapers.json")
-    private var shuffleTimer: DispatchSourceTimer?
+    private static var shuffleLoop: DispatchSourceTimer?
 
     enum LocalSortMode: String, CaseIterable {
         case date = "date"
@@ -103,13 +105,7 @@ class macpaperService: NSObject, ObservableObject {
         loadVolume()
         screenCount = NSScreen.screens.count
         loadScreenWallpapers()
-        if shuffleEnabled {
-            startShuffleTimer()
-        }
-    }
-
-    deinit {
-        shuffleTimer?.cancel()
+        macpaperService.syncShuffleLoop()
     }
 
     public func launchGlasswpDaemon() {
@@ -173,40 +169,79 @@ class macpaperService: NSObject, ObservableObject {
 
     func setShuffleEnabled(_ enabled: Bool) {
         shuffleEnabled = enabled
-        UserDefaults.standard.set(enabled, forKey: "moonleaf_shuffleEnabled")
-        if enabled {
-            startShuffleTimer()
-        } else {
-            shuffleTimer?.cancel()
-            shuffleTimer = nil
-        }
+        UserDefaults.standard.set(enabled, forKey: macpaperService.shuffleEnabledKey)
+        macpaperService.syncShuffleLoop()
     }
 
     func setShuffleInterval(_ interval: ShuffleInterval) {
         shuffleInterval = interval
-        UserDefaults.standard.set(interval.rawValue, forKey: "moonleaf_shuffleInterval")
+        UserDefaults.standard.set(interval.rawValue, forKey: macpaperService.shuffleIntervalKey)
         if shuffleEnabled {
-            startShuffleTimer()
+            macpaperService.restartShuffleLoop()
         }
     }
 
-    private func startShuffleTimer() {
-        shuffleTimer?.cancel()
+    private static let shuffleEnabledKey = "moonleaf_shuffleEnabled"
+    private static let shuffleIntervalKey = "moonleaf_shuffleInterval"
+    private static let lastShuffleKey = "moonleaf_lastShuffle"
+
+    /// Arms the rotation loop when the setting is on and no loop is running yet.
+    ///
+    /// The loop is deliberately process-wide: every window, menu and settings
+    /// pane builds its own short-lived `macpaperService`, so an instance-owned
+    /// timer dies with whatever window happened to create it.
+    static func syncShuffleLoop() {
+        let enabled = UserDefaults.standard.bool(forKey: shuffleEnabledKey)
+        guard enabled else {
+            shuffleLoop?.cancel()
+            shuffleLoop = nil
+            return
+        }
+        guard shuffleLoop == nil else { return }
+        let intervalRaw = UserDefaults.standard.string(forKey: shuffleIntervalKey)
+        let interval = intervalRaw.flatMap(ShuffleInterval.init(rawValue:)) ?? .oneHour
         let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .background))
-        timer.schedule(deadline: .now() + shuffleInterval.seconds, repeating: shuffleInterval.seconds)
-        timer.setEventHandler { [weak self] in
-            self?.shuffleToNext()
-        }
+        timer.schedule(deadline: .now() + interval.seconds, repeating: interval.seconds)
+        timer.setEventHandler { macpaperService.shuffleTick() }
         timer.resume()
-        shuffleTimer = timer
+        shuffleLoop = timer
     }
 
-    private func shuffleToNext() {
-        guard !wallpapers.isEmpty else { return }
-        let randomWallpaper = wallpapers.randomElement()!
+    private static func restartShuffleLoop() {
+        shuffleLoop?.cancel()
+        shuffleLoop = nil
+        syncShuffleLoop()
+    }
+
+    /// Long-lived instance the rotation loop drives, so the post-set work
+    /// (screensaver copy, screen bookkeeping, animated-wallpaper notification)
+    /// is not dropped when a throwaway instance goes away first.
+    private static let rotationService = macpaperService()
+
+    private static func shuffleTick() {
+        guard let next = random_library_wallpaper() else { return }
         DispatchQueue.main.async {
-            self.set_wp(randomWallpaper)
+            rotationService.set_wp(next)
         }
+    }
+
+    /// Rotates inside the library root, honouring the Show Images/Videos
+    /// settings, skipping folders (they are not settable) and never returning
+    /// the file that was used for the previous rotation.
+    private static func random_library_wallpaper() -> endup_wp? {
+        let settings = load_settings_json()
+        let showImages = (settings["showImages"] ?? "true") == "true"
+        let showVideos = (settings["showVideos"] ?? "true") == "true"
+        let candidates = scan_library(wp_storage_dir).filter {
+            !$0.isFolder && is_visible($0, showImages: showImages, showVideos: showVideos)
+        }
+        guard candidates.count > 1 else { return candidates.first }
+
+        let previous = UserDefaults.standard.string(forKey: lastShuffleKey)
+        let pool = candidates.filter { $0.path != previous }
+        guard let next = (pool.isEmpty ? candidates : pool).randomElement() else { return nil }
+        UserDefaults.standard.set(next.path, forKey: lastShuffleKey)
+        return next
     }
 
     func _ap_enabled(_ enabled: Bool) {
@@ -221,20 +256,22 @@ class macpaperService: NSObject, ObservableObject {
         )
     }
 
+    static func load_settings_json() -> [String: String] {
+        guard let data = try? Data(contentsOf: settings_file),
+              let settings = try? JSONDecoder().decode([String: String].self, from: data) else {
+            return [:]
+        }
+        return settings
+    }
+
     private func loadSettings() {
-        do {
-            if FileManager.default.fileExists(atPath: settings_file.path) {
-                let data = try Data(contentsOf: settings_file)
-                if let settings = try? JSONDecoder().decode([String: String].self, from: data) {
-                    ap_is_enabled = (settings["ap_is_enabled"] == "true")
-                    showVideos = (settings["showVideos"] ?? "true") == "true"
-                    showImages = (settings["showImages"] ?? "true") == "true"
-                    if let methodRaw = settings["import_method"], let method = ImportMethod(rawValue: methodRaw) {
-                        importMethod = method
-                    }
-                }
-            }
-        } catch {}
+        let settings = macpaperService.load_settings_json()
+        ap_is_enabled = (settings["ap_is_enabled"] == "true")
+        showVideos = (settings["showVideos"] ?? "true") == "true"
+        showImages = (settings["showImages"] ?? "true") == "true"
+        if let methodRaw = settings["import_method"], let method = ImportMethod(rawValue: methodRaw) {
+            importMethod = method
+        }
 
         currentPath = wp_storage_dir
 
@@ -298,83 +335,67 @@ class macpaperService: NSObject, ObservableObject {
         try? "\(vol_in_percentage)".write(to: volFile, atomically: true, encoding: .utf8)
     }
 
+    /// Lists every folder and media file directly inside `directory`, unsorted
+    /// and unfiltered; callers decide what to keep visible.
+    static func scan_library(_ directory: URL) -> [endup_wp] {
+        let scanPath = directory.resolvingSymlinksInPath()
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: scanPath,
+            includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey, .isDirectoryKey]) else {
+            return []
+        }
+
+        let validExts = ["mov", "mp4", "gif", "jpg", "jpeg", "png"]
+        return files.compactMap { url -> endup_wp? in
+            var isDir: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) else { return nil }
+            let isFolder = isDir.boolValue
+            if !isFolder && !validExts.contains(url.pathExtension.lowercased()) { return nil }
+
+            let rv = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
+            let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
+            let modDate = rv?.contentModificationDate
+                ?? (attrs?[.modificationDate] as? Date)
+                ?? Date.distantPast
+            let fileSize = rv?.fileSize.map(Int64.init)
+                ?? (attrs?[.size] as? Int64)
+                ?? 0
+
+            return endup_wp(
+                id: UUID(),
+                name: url.deletingPathExtension().lastPathComponent,
+                path: url.path,
+                preview: nil,
+                createdDate: modDate,
+                fileSize: fileSize,
+                isFolder: isFolder
+            )
+        }
+    }
+
+    static func is_visible(_ wallpaper: endup_wp, showImages: Bool, showVideos: Bool) -> Bool {
+        let ext = (wallpaper.path as NSString).pathExtension.lowercased()
+        if !showVideos && ["mov", "mp4", "gif"].contains(ext) { return false }
+        if !showImages && !wallpaper.isFolder && ["jpg", "jpeg", "png"].contains(ext) { return false }
+        return true
+    }
+
     func fetch_wallpapers() {
         isLoading = true
 
         try? FileManager.default.createDirectory(at: wp_storage_dir, withIntermediateDirectories: true)
+        let scanPath = currentPath ?? wp_storage_dir
 
         DispatchQueue.global(qos: .background).async { [weak self] in
-            guard let self = self else { return }
-            do {
-                let scanPath = (self.currentPath ?? self.wp_storage_dir).resolvingSymlinksInPath()
-                let files = try FileManager.default.contentsOfDirectory(
-                    at: scanPath,
-                    includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey, .isDirectoryKey])
+            let items = macpaperService.scan_library(scanPath)
 
-                let validExts = ["mov", "mp4", "gif", "jpg", "jpeg", "png"]
-                let possible_wp_obj = files.filter { url in
-                    var isDir: ObjCBool = false
-                    if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) {
-                        if isDir.boolValue { return true }
-                    }
-                    return validExts.contains(url.pathExtension.lowercased())
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.wallpapers = items.filter {
+                    macpaperService.is_visible($0, showImages: self.showImages, showVideos: self.showVideos)
                 }
-
-                let items = possible_wp_obj.compactMap { url -> endup_wp? in
-                    var isDir: ObjCBool = false
-                    FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir)
-                    let isFolder = isDir.boolValue
-                    
-                    let rv = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
-
-                    let modDate: Date
-                    if let d = rv?.contentModificationDate {
-                        modDate = d
-                    } else if let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
-                              let d = attrs[.modificationDate] as? Date {
-                        modDate = d
-                    } else {
-                        modDate = Date.distantPast
-                    }
-
-                    let fileSize: Int64
-                    if let sz = rv?.fileSize {
-                        fileSize = Int64(sz)
-                    } else if let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
-                              let sz = attrs[.size] as? Int64 {
-                        fileSize = sz
-                    } else {
-                        fileSize = 0
-                    }
-
-                    return endup_wp(
-                        id: UUID(),
-                        name: url.deletingPathExtension().lastPathComponent,
-                        path: url.path,
-                        preview: nil,
-                        createdDate: modDate,
-                        fileSize: fileSize,
-                        isFolder: isFolder
-                    )
-                }
-
-                DispatchQueue.main.async {
-                    var filtered = items
-
-                    if !self.showVideos {
-                        filtered = filtered.filter { !["mov", "mp4", "gif"].contains(($0.path as NSString).pathExtension.lowercased()) }
-                    }
-
-                    if !self.showImages {
-                        filtered = filtered.filter { $0.isFolder || !["jpg", "jpeg", "png"].contains(($0.path as NSString).pathExtension.lowercased()) }
-                    }
-
-                    self.wallpapers = filtered
-                    self.applyLocalSort()
-                    self.isLoading = false
-                }
-            } catch {
-                DispatchQueue.main.async { self.isLoading = false }
+                self.applyLocalSort()
+                self.isLoading = false
             }
         }
     }
@@ -566,6 +587,10 @@ class macpaperService: NSObject, ObservableObject {
     }
 
     private func _exec(_ arguments: [String], completion: @escaping (Bool) -> Void) {
+        guard FileManager.default.isExecutableFile(atPath: arguments[0]) else {
+            completion(false)
+            return
+        }
         DispatchQueue.global(qos: .background).async {
             let task = Process()
             task.launchPath = arguments[0]
@@ -581,7 +606,9 @@ class macpaperService: NSObject, ObservableObject {
 
     private func _exec_wallpaper(_ arguments: [String], completion: @escaping (Bool) -> Void) {
         let cliPath = Bundle.main.bundlePath + "/Contents/Resources/bin/wallpaper"
-        guard FileManager.default.fileExists(atPath: cliPath) else {
+        // `Process.launch()` raises an uncaught NSException when the helper is
+        // missing or not executable, which kills the whole app.
+        guard FileManager.default.isExecutableFile(atPath: cliPath) else {
             completion(false)
             return
         }

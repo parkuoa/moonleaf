@@ -8,7 +8,7 @@ assignees: ''
 ---
 
 ## Fill out these checks:
-- [ ] This issue occurs in an official, released version of macpaper
+- [ ] This issue occurs in an official, released version of moonleaf
 - [ ] I am not in a beta release of macOS
 
 (Read accordingly, and put an x between the brackets)
@@ -29,8 +29,8 @@ Steps to reproduce the behavior:
 ## Expected behavior
 A clear and concise description of what you expected to happen.
 
-## Screenshots
-If possible, submit screenshots that may help both explain and resolve the bug.
+## Screenshots/Video
+If appropriate, submit a video or screenshots that may help both explain and resolve the bug.
 
 ## Additional context
-Add anything else you consider appropriate here.
+Add anything else you consider appropriate here, if you wish to do so.

@@ -1,3 +1,10 @@
 **/.DS_Store
-build/
 moonleaf/resources/bin/wallpaper
+/.vscode
+**/*.pem
+
+# release
+build/
+**/*.dmg
+**/*.dmg.sha256
+**/*.dmg.sha256.sig
